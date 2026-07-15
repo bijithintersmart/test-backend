@@ -1,0 +1,71 @@
+name: Enterprise Backend CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master, development ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  integrate:
+    name: Code Integration Check
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: enterprise_db_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Repository Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Lint Code check
+        run: npm run lint
+        continue-on-error: true # Allow PR review even if linter has styling remarks
+
+      - name: Run Schema generation
+        run: npx prisma generate --schema=src/database/prisma/schema.prisma
+
+      - name: Verify Typescript Compiles
+        run: npm run build
+
+      - name: Run Test Suite
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/enterprise_db_test?schema=public
+          REDIS_URL: redis://localhost:6379
+          JWT_ACCESS_SECRET: github-actions-ci-test-access-token-key-long-enough-32bytes
+          JWT_REFRESH_SECRET: github-actions-ci-test-refresh-token-key-long-enough-32bytes
+        run: npm run test
+
+      - name: Verify Docker Container Compilation
+        run: docker build -t enterprise-backend:latest .
