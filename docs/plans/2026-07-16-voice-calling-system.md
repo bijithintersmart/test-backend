@@ -2,27 +2,30 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Implement a low-cost, secure 1-to-1 voice calling system using WebRTC P2P audio streaming (no video track overhead) and Socket.io signaling.
+**Goal: Implement a low-cost, secure 1-to-1 voice calling system. Supports either **Direct WebRTC P2P** or **LiveKit SFU** connections.
 
 Node.js Backend & Flutter Frontend Split:
 
 - **Backend (Node.js, Express, TypeScript)**:
-  - Relays WebRTC signaling payloads (SDP description offers, answers, and ICE candidate exchanges) through Socket.io.
-  - Verifies that both caller and receiver are conversation members before forwarding socket call payloads.
-  - Exposes an endpoint (`GET /api/v1/chats/calling/ice-servers`) that generates secure temporary TURN credentials (using HMAC-SHA1 signature).
-  - Enqueues BullMQ notification jobs to send FCM push payloads if the socket indicates a recipient is offline.
+  - For WebRTC P2P: Relays signaling SDPs through Socket.io and generates temporary coturn TURN credentials.
+  - For LiveKit Option: Generates short-lived Access Tokens using `livekit-server-sdk` to authenticate calling rooms.
+  - Verifies conversation member whitelisting before enabling calls.
+  - Enqueues BullMQ background tasks to fire FCM pushes if the recipient is offline.
   - Logs completed call sessions (`type: AUDIO`) in PostgreSQL.
 - **Frontend (Flutter Mobile App)**:
-  - Requests secure short-lived TURN credentials via REST.
-  - Establishes a Peer Connection (`flutter_webrtc`) with video track disabled, generating local SDP offers/answers.
-  - Exchanges SDP/ICE candidate payloads through Socket.io signaling hooks.
-  - Handles foreground socket call rings and background FCM push messages, rendering custom call overlays.
+  - If P2P: Establishes Peer Connections using the `flutter_webrtc` package.
+  - If LiveKit Option: Instantiates voice rooms using the `livekit_client` package and fetches connection tokens from the backend.
+  - Listens for background FCM wakeup pushes to open call ring layouts.
 
-**Budget-Oriented & Free Tier Services:**
+**Budget-Oriented & Free Tier Services (Options):**
 
-- **Media Streaming**: **WebRTC P2P (Peer-to-Peer)**. Audio data streams directly between mobile devices. Server bandwidth cost = **$0**.
-- **STUN Server**: **Google Public STUN** (`stun:stun.l.google.com:19302`) - 100% Free for public IP resolution.
-- **TURN Server**: **Metered.ca** (Generous **50 GB/month FREE tier** of relayed bandwidth for strict firewalls).
+- **Option A: Pure WebRTC P2P (Default)**
+  - *Media Streaming*: Audio data streams directly device-to-device. Server bandwidth = **$0**.
+  - *STUN/TURN*: Google Public STUN ($0) + Metered.ca (50GB free tier/mo).
+- **Option B: LiveKit Integration (Alternative)**
+  - *LiveKit Cloud*: Generous **50 GB/month FREE tier** of voice bandwidth, including high-availability STUN/TURN configurations.
+  - *Self-Hosted fallback*: Run the open-source LiveKit Server on a cheap $5/mo VPS for infinite scaling with no licensing costs.
+  - *Token generation*: Runs on the backend Express server at **$0** monthly cost.
 - **Background Wakeup**: **FCM Push Notifications** (100% Free) to wake up backgrounded Flutter apps during incoming calls.
 
 **Architecture:**

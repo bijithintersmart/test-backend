@@ -2,29 +2,32 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Implement a secure, low-cost 1-to-1 video calling system featuring direct WebRTC video/audio streams and optional client-side ML-driven sensitive content filtering telemetry logs.
+**Goal: Implement a secure, low-cost 1-to-1 video calling system featuring direct audio/video streams. Supports either **Direct WebRTC P2P** or **LiveKit SFU** connections.
 
-**Node.js Backend & Flutter Frontend Split:**
+Node.js Backend & Flutter Frontend Split:
 
 - **Backend (Node.js, Express, TypeScript)**:
-  - Relays WebRTC signaling payloads (SDP description offers, answers, and ICE candidate exchanges) through Socket.io.
-  - Verifies that both caller and receiver are conversation members before forwarding socket call payloads.
-  - Exposes an endpoint (`GET /api/v1/chats/calling/ice-servers`) that generates secure temporary TURN credentials (using HMAC-SHA1 signature).
-  - Enqueues BullMQ notification jobs to send FCM push payloads if the socket indicates a recipient is offline.
+  - For WebRTC P2P: Relays signaling SDPs through Socket.io and generates temporary coturn TURN credentials.
+  - For LiveKit Option: Generates short-lived Access Tokens using `livekit-server-sdk` to authorize video rooms.
+  - Verifies conversation member whitelisting before enabling calls.
+  - Enqueues BullMQ background tasks to fire FCM pushes if the recipient is offline.
   - Logs completed call sessions (`type: VIDEO`) in PostgreSQL.
   - Sockets listen for device-local telemetry flags (`call:flag`), updating the database record as `isFlagged: true` for admin audit.
 - **Frontend (Flutter Mobile App)**:
-  - Requests secure short-lived TURN credentials via REST.
-  - Establishes a Peer Connection (`flutter_webrtc`) with both video and audio enabled, generating local SDP offers/answers.
-  - Exchanges SDP/ICE candidate payloads through Socket.io signaling hooks.
+  - If P2P: Establishes Peer Connections using the `flutter_webrtc` package.
+  - If LiveKit Option: Instantiates video rooms using the `livekit_client` package and fetches connection tokens from the backend.
   - Runs local, device-only frame classification using **TensorFlow Lite (TFLite)** + **NSFW-TFLite** model (disabled by default, enabled on-demand).
   - If nsfw classes are flagged on-device: blurs local screen frame and emits `call:flag` event to the socket server.
 
-**Budget-Oriented & Free Tier Services:**
+**Budget-Oriented & Free Tier Services (Options):**
 
-- **Media Streaming**: **WebRTC P2P (Peer-to-Peer)**. Audio and video streams directly device-to-device. Server media/bandwidth cost = **$0**.
-- **STUN Server**: **Google Public STUN** (`stun:stun.l.google.com:19302`) - 100% Free.
-- **TURN Server**: **Metered.ca** (Generous **50 GB/month FREE tier** of relayed bandwidth for strict firewalls).
+- **Option A: Pure WebRTC P2P (Default)**
+  - *Media Streaming*: Audio/video data streams directly device-to-device. Server bandwidth = **$0**.
+  - *STUN/TURN*: Google Public STUN ($0) + Metered.ca (50GB free tier/mo).
+- **Option B: LiveKit Integration (Alternative)**
+  - *LiveKit Cloud*: Generous **50 GB/month FREE tier** of video/audio bandwidth, including high-availability STUN/TURN configurations.
+  - *Self-Hosted fallback*: Run the open-source LiveKit Server on a cheap $5/mo VPS for infinite scaling with no licensing costs.
+  - *Token generation*: Runs on the backend Express server at **$0** monthly cost.
 - **Client-Side Moderation**: **TensorFlow Lite (TFLite)** + **NSFW-TFLite** model loaded locally on the Flutter mobile client. Avoids expensive server GPU classification. Compute cost = **$0**.
 - **Background Wakeup**: **FCM Push Notifications** (100% Free) to wake up backgrounded Flutter apps during incoming calls.
 
