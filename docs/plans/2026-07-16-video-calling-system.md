@@ -4,6 +4,22 @@
 
 **Goal:** Implement a secure, low-cost 1-to-1 video calling system featuring direct WebRTC video/audio streams and optional client-side ML-driven sensitive content filtering telemetry logs.
 
+**Node.js Backend & Flutter Frontend Split:**
+
+- **Backend (Node.js, Express, TypeScript)**:
+  - Relays WebRTC signaling payloads (SDP description offers, answers, and ICE candidate exchanges) through Socket.io.
+  - Verifies that both caller and receiver are conversation members before forwarding socket call payloads.
+  - Exposes an endpoint (`GET /api/v1/chats/calling/ice-servers`) that generates secure temporary TURN credentials (using HMAC-SHA1 signature).
+  - Enqueues BullMQ notification jobs to send FCM push payloads if the socket indicates a recipient is offline.
+  - Logs completed call sessions (`type: VIDEO`) in PostgreSQL.
+  - Sockets listen for device-local telemetry flags (`call:flag`), updating the database record as `isFlagged: true` for admin audit.
+- **Frontend (Flutter Mobile App)**:
+  - Requests secure short-lived TURN credentials via REST.
+  - Establishes a Peer Connection (`flutter_webrtc`) with both video and audio enabled, generating local SDP offers/answers.
+  - Exchanges SDP/ICE candidate payloads through Socket.io signaling hooks.
+  - Runs local, device-only frame classification using **TensorFlow Lite (TFLite)** + **NSFW-TFLite** model (disabled by default, enabled on-demand).
+  - If nsfw classes are flagged on-device: blurs local screen frame and emits `call:flag` event to the socket server.
+
 **Budget-Oriented & Free Tier Services:**
 
 - **Media Streaming**: **WebRTC P2P (Peer-to-Peer)**. Audio and video streams directly device-to-device. Server media/bandwidth cost = **$0**.
@@ -24,6 +40,13 @@
   - If a violation is flagged on the device, the Flutter app blurs the screen and sends a socket event `call:flag` to the server. The server updates the database call log (`isFlagged: true`, `flaggedReason: reason`) for admin audits.
 
 **Tech Stack:** Node.js, Express, TypeScript, Prisma, Redis, BullMQ, WebRTC (audio + video), Firebase Admin SDK.
+
+Flutter Client Compatibility Rules:
+
+- **High-Priority FCM Wakes**: In video calling, incoming call notifications must be marked with FCM `"priority": "high"` and APNS `"apns-priority": "10"` headers to wake the client app from sleep modes to display the incoming ring interface.
+- **Dynamic ICE configuration**: Ensure the `/ice-servers` API response structure directly matches the `RTCConfiguration` input requirements of the `flutter_webrtc` package, formatting the URIs as: `{"urls": ["turn:domain:port"], "username": "...", "credential": "..."}`.
+- **Signaling Relays**: WebRTC signaling events (`call:signal`) must relay raw SDP and ICE candidate JSON values without formatting edits to prevent decoder mismatches inside the `flutter_webrtc` client.
+- **ML Telemetry Flags**: The backend `call:flag` socket event listener must parse structured payloads matching standard on-device image classifier outputs (e.g. `{"callId": "...", "confidence": 0.89, "label": "pornography"}`) to record flagged states correctly in the database.
 
 ---
 

@@ -4,6 +4,18 @@
 
 **Goal:** Integrate Stripe payments so that communication (chat, voice calling, and video calling) is unlocked for the initiator (guest) and target user (partner) only after a successful connection payment checkout.
 
+**Node.js Backend & Flutter Frontend Split:**
+
+- **Backend (Node.js, Express, TypeScript)**:
+  - Generates secure Stripe Checkout Sessions (`POST /api/v1/payments/checkout`) containing metadata details (buyer ID, partner ID, connection ID).
+  - Exposes dynamic raw-parser endpoint (`POST /api/v1/payments/webhook`) receiving Stripe webhook notifications.
+  - Verifies signatures cryptographically using `stripe.webhooks.constructEvent` with webhook signing secrets.
+  - Runs transactional SQL updates (Prisma) transitioning connection status to `ACCEPTED` and logging transaction details.
+- **Frontend (Flutter Mobile App)**:
+  - Hits `/api/v1/payments/checkout` to get the redirect URL when initiating chats with non-whitelisted users.
+  - Launches standard in-app Stripe Payment Sheets (`flutter_stripe`) or redirects to checkout URLs.
+  - Listens to successful transaction FCM push alerts to trigger direct connection activations.
+
 **Budget-Oriented & Free Tier Services:**
 
 - **Payment Processor**: **Stripe** (Pay-as-you-go: **$0 setup or monthly fees**, 2.9% + $0.30 per successful transaction). You only pay when you make a sale.
@@ -21,6 +33,11 @@
 - **Notification Trigger**: Enqueues a notification job in BullMQ to send FCM push alerts to both users notifying them that connection access is unlocked.
 
 **Tech Stack:** Node.js, Express, TypeScript, Prisma (PostgreSQL), Stripe Node SDK, Redis (BullMQ).
+
+Flutter Client Compatibility Rules:
+
+- **Mobile Deep-Linking Redirects**: During Stripe Checkout Session creation, the `success_url` and `cancel_url` parameters must accept deep-link schemas (`myapp://payment-success` or verified Android App Links / iOS Universal Links) so the mobile browser returns the user directly back into the Flutter app target view upon payment completion.
+- **Webhook Idempotency & Pushes**: Since webhook retries are common, the webhook controller must perform database validation against `stripeSessionId` in `PaymentLog` before updating states to prevent multiple event emissions. Upon success, FCM push notifications must immediately alert the receiver's Flutter background services to activate conversation permissions without requiring app restarts.
 
 ---
 

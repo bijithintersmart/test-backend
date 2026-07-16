@@ -2,7 +2,21 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Build a production-grade, secure, and low-cost 1-to-1 chatting and file-sharing system optimized for a Flutter mobile app.
+**Goal:** Build a production-grade, secure, and low-cost 1-to-1 chatting and file-sharing system.
+
+**Node.js Backend & Flutter Frontend Split:**
+
+- **Backend (Node.js, Express, TypeScript)**:
+  - Establishes Socket.io server with Redis Pub/Sub adapter to sync chat channels.
+  - Handles database validation (Prisma/PostgreSQL) checking if users are connected (`UserConnection` is `ACCEPTED`) before creating channels.
+  - Runs Trie-based profanity scanner inside message save pipelines.
+  - Exposes secure file retrieval router (`GET /conversations/:id/attachments/:attachmentId`) checking conversation membership before serving attachments.
+  - Enqueues BullMQ jobs to dispatch FCM pushes when sockets determine a recipient is offline.
+- **Frontend (Flutter Mobile App)**:
+  - Establishes persistent WebSocket connection using `socket_io_client` with JWT auth headers.
+  - Listens to incoming push notification payloads (`firebase_messaging`) in the background/terminated states to trigger UI wakes.
+  - Integrates file upload pipelines, fetching attachments via authenticated API requests.
+  - Emits real-time typing status events (`typing:status`) and presence state indicators.
 
 **Budget-Oriented & Free Tier Services:**
 
@@ -19,6 +33,12 @@
 - **Secure File Sharing**: Integrates Cloudflare R2 with the S3 uploads module. Uploaded attachments are served via an Express router that verifies conversation membership before streaming files.
 
 **Tech Stack:** Node.js, Express, TypeScript, Prisma (PostgreSQL), Redis (ioredis + socket.io-redis), BullMQ, Firebase Admin SDK.
+
+Flutter Client Compatibility Rules:
+
+- **WebSocket Handshake Auth**: The backend socket auth middleware must parse tokens from both `socket.handshake.auth.token` and `socket.handshake.query.token` since the Flutter `socket_io_client` package utilizes query-param connection strings on some mobile OS runtimes.
+- **FCM Push Payload**: FCM notifications sent by the BullMQ worker must contain a `data` key payload with a flat JSON format (e.g. `{"click_action": "FLUTTER_NOTIFICATION_CLICK", "type": "CHAT", "conversationId": "id"}`) for compatibility with native background handlers.
+- **Secure Attachment Headers**: Serve download streams with exact `Content-Type`, `Content-Length`, and `Content-Disposition` headers so that Flutter file downloaders (e.g. `dio`, `flutter_downloader`) can calculate download progress and write local cache files correctly.
 
 ---
 

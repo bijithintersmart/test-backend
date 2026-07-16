@@ -4,6 +4,20 @@
 
 **Goal:** Implement a low-cost, secure 1-to-1 voice calling system using WebRTC P2P audio streaming (no video track overhead) and Socket.io signaling.
 
+Node.js Backend & Flutter Frontend Split:
+
+- **Backend (Node.js, Express, TypeScript)**:
+  - Relays WebRTC signaling payloads (SDP description offers, answers, and ICE candidate exchanges) through Socket.io.
+  - Verifies that both caller and receiver are conversation members before forwarding socket call payloads.
+  - Exposes an endpoint (`GET /api/v1/chats/calling/ice-servers`) that generates secure temporary TURN credentials (using HMAC-SHA1 signature).
+  - Enqueues BullMQ notification jobs to send FCM push payloads if the socket indicates a recipient is offline.
+  - Logs completed call sessions (`type: AUDIO`) in PostgreSQL.
+- **Frontend (Flutter Mobile App)**:
+  - Requests secure short-lived TURN credentials via REST.
+  - Establishes a Peer Connection (`flutter_webrtc`) with video track disabled, generating local SDP offers/answers.
+  - Exchanges SDP/ICE candidate payloads through Socket.io signaling hooks.
+  - Handles foreground socket call rings and background FCM push messages, rendering custom call overlays.
+
 **Budget-Oriented & Free Tier Services:**
 
 - **Media Streaming**: **WebRTC P2P (Peer-to-Peer)**. Audio data streams directly between mobile devices. Server bandwidth cost = **$0**.
@@ -20,6 +34,12 @@
 - **Call Logger**: Database log records (`type: AUDIO`) to track caller, receiver, call duration, connection date, and ended status.
 
 **Tech Stack:** Node.js, Express, TypeScript, Prisma, Redis (ioredis), BullMQ, WebRTC (audio-only), Firebase Admin SDK.
+
+Flutter Client Compatibility Rules:
+
+- **High-Priority FCM Wakes**: In voice calling, incoming call notifications must be marked with FCM `"priority": "high"` and APNS `"apns-priority": "10"` headers to wake the client app from sleep modes to display the incoming ring interface.
+- **Dynamic ICE configuration**: Ensure the `/ice-servers` API response structure directly matches the `RTCConfiguration` input requirements of the `flutter_webrtc` package, formatting the URIs as: `{"urls": ["turn:domain:port"], "username": "...", "credential": "..."}`.
+- **Signaling Relays**: WebRTC signaling events (`call:signal`) must relay raw SDP and ICE candidate JSON values without formatting edits to prevent decoder mismatches inside the `flutter_webrtc` client.
 
 ---
 
