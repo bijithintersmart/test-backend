@@ -44,3 +44,5 @@ prisma/migrations/*.sql.map
 
 # Optional dependencies that shouldn't be installed
 npm-shrinkwrap.json
+
+.env

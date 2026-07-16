@@ -3,6 +3,7 @@ import { db } from '../../database/db';
 import { redisService } from '../../services/redis.service';
 import { logger } from '../../core/logger/logger';
 import { sendSuccess } from '../../core/utils/response';
+import healthStatus from "./healthStatus";
 
 export class HealthController {
   // Liveness check - verifies the server process is running
@@ -16,32 +17,75 @@ export class HealthController {
 
   // Readiness check - verifies external services (DB, Redis) are ready to receive requests
   async getReady(_req: Request, res: Response) {
-    const checks: Record<string, 'UP' | 'DOWN'> = {
-      server: 'UP',
-      database: 'DOWN',
-      redis: 'DOWN',
+        // Initialize checks from stored health status
+    const checks: Record<string, { status: 'UP' | 'DOWN'; error?: string; downtime?: number }> = {
+      server: { status: healthStatus.server.status },
+      database: { status: healthStatus.database.status },
+      redis: { status: healthStatus.redis.status },
     };
 
+    // Helper to update status tracking
+    const updateStatus = (name: keyof typeof healthStatus, isUp: boolean, err?: Error) => {
+      const svc = healthStatus[name];
+      if (isUp) {
+        if (svc.status === 'DOWN') {
+          // Transition to UP
+          svc.status = 'UP';
+          svc.lastChange = Date.now();
+          svc.error = undefined;
+        }
+      } else {
+        if (svc.status === 'UP') {
+          // Transition to DOWN
+          svc.status = 'DOWN';
+          svc.lastChange = Date.now();
+          svc.error = err?.message;
+        } else {
+          // Remain DOWN, update error if provided
+          svc.error = err?.message;
+        }
+      }
+    };
+
+    // Check Database
     try {
-      // Test DB
       await db.$queryRaw`SELECT 1`;
-      checks.database = 'UP';
+      updateStatus("database", true);
     } catch (err) {
-      logger.error(err as Error, 'Readiness probe failed on database check');
+      logger.error(err as Error, "Readiness probe failed on database check");
+      updateStatus("database", false, err as Error);
     }
 
+    // Check Redis
     try {
-      // Test Redis
       const redisClient = redisService.getClient();
       const ping = await redisClient.ping();
-      if (ping === 'PONG') {
-        checks.redis = 'UP';
+      if (ping === "PONG") {
+        updateStatus("redis", true);
+      } else {
+        updateStatus("redis", false, new Error("Unexpected ping response"));
       }
     } catch (err) {
-      logger.error(err as Error, 'Readiness probe failed on Redis check');
+      logger.error(err as Error, "Readiness probe failed on Redis check");
+      updateStatus("redis", false, err as Error);
     }
 
-    const isReady = Object.values(checks).every((status) => status === 'UP');
+    // Refresh checks from updated healthStatus
+    checks.server.status = healthStatus.server.status;
+    checks.database.status = healthStatus.database.status;
+    checks.redis.status = healthStatus.redis.status;
+
+    // Attach error messages and downtime (in seconds) for DOWN services
+    const now = Date.now();
+    for (const [key, value] of Object.entries(checks)) {
+      const svc = healthStatus[key as keyof typeof healthStatus];
+      if (svc.status === 'DOWN') {
+        value.error = svc.error;
+        value.downtime = Math.round((now - svc.lastChange) / 1000);
+      }
+    }
+
+    const isReady = Object.values(checks).every((c) => c.status === "UP");
 
     return sendSuccess({
       res,
