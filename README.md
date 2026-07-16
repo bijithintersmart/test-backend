@@ -1,5 +1,9 @@
 # Enterprise Node.js + Express.js TypeScript Backend
 
+> [!IMPORTANT]
+> **AI / Developer Rulebook:**
+> All developers and AI assistants (Gemini, Claude, GPT, etc.) must strictly adhere to the guidelines defined in [DEVELOPMENT_RULES.md](DEVELOPMENT_RULES.md), [.cursorrules](.cursorrules), and [CLAUDE.md](CLAUDE.md) before writing any code or executing commands.
+
 An enterprise-grade, highly scalable, and production-ready REST API backend built with **Node.js**, **Express.js**, and **TypeScript**, following strict clean-code architecture and Domain-Driven Design (DDD) principles.
 
 ---

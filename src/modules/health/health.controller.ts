@@ -16,13 +16,17 @@ export class HealthController {
   }
 
   // Readiness check - verifies external services (DB, Redis) are ready to receive requests
-  async getReady(_req: Request, res: Response) {
-        // Initialize checks from stored health status
+  async getReady(req: Request, res: Response) {
+    // Initialize checks from stored health status
     const checks: Record<string, { status: 'UP' | 'DOWN'; error?: string; downtime?: number }> = {
       server: { status: healthStatus.server.status },
       database: { status: healthStatus.database.status },
       redis: { status: healthStatus.redis.status },
     };
+
+    // Extract client IP and User-Agent for detailed diagnostics
+    const clientIp = (req.headers['x-forwarded-for']?.toString().split(',')[0].trim()) || req.socket?.remoteAddress || '';
+    const userAgent = req.headers['user-agent']?.toString() || '';
 
     // Helper to update status tracking
     const updateStatus = (name: keyof typeof healthStatus, isUp: boolean, err?: Error) => {
@@ -94,6 +98,8 @@ export class HealthController {
       data: {
         status: isReady ? 'UP' : 'DOWN',
         checks,
+        clientIp,
+        userAgent,
       },
     });
   }

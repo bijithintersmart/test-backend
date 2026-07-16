@@ -1,0 +1,10 @@
+# AI Behavior & Coding Rules
+
+Please refer to and strictly enforce the guidelines defined in [DEVELOPMENT_RULES.md](file:///Users/intersamrt/Documents/backend/DEVELOPMENT_RULES.md).
+
+Key directives:
+
+1. Do not use unnecessary, complex shell commands (this is a single-developer project; keep commands simple and standard).
+2. If code needs to be completed, write explicit, detailed `// TODO:` comments explaining what needs to be done.
+3. Keep the codebase minimal and clean. Do not over-engineer or add speculative utilities (adhere to YAGNI).
+4. Use standard TypeScript naming conventions and verify all method calls match their signatures exactly.

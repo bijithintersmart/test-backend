@@ -94,8 +94,8 @@ describe('Health Check API Integration Tests', () => {
       expect(res.statusCode).toEqual(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data.status).toEqual('UP');
-      expect(res.body.data.checks.database).toEqual('UP');
-      expect(res.body.data.checks.redis).toEqual('UP');
+      expect(res.body.data.checks.database.status).toEqual('UP');
+      expect(res.body.data.checks.redis.status).toEqual('UP');
     });
   });
 });
