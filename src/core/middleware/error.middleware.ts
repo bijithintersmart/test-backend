@@ -26,12 +26,14 @@ export const errorHandler = (
   }
 
   // Handle database / Prisma / external errors specifically if needed
-  logger.error({
-    msg: `Unhandled Error: ${err.message}`,
-    stack: err.stack,
-    method: req.method,
-    url: req.originalUrl,
-  });
+  logger.error(
+    {
+      err,
+      method: req.method,
+      url: req.originalUrl,
+    },
+    `Unhandled Error: ${err.message}`
+  );
 
   return res.status(500).json({
     success: false,
