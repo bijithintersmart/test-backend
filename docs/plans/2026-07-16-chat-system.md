@@ -4,12 +4,19 @@
 
 **Goal:** Build a production-grade, secure, and low-cost 1-to-1 chatting and file-sharing system optimized for a Flutter mobile app.
 
+**Budget-Oriented & Free Tier Services:**
+
+- **File Storage**: **Cloudflare R2** ($0 egress data-transfer fees, 10GB/month free storage tier) via the AWS S3 SDK compatibility interface (`@aws-sdk/client-s3`).
+- **Push Notifications**: **Firebase Cloud Messaging (FCM)** (100% free with unlimited push payloads) via Node `firebase-admin` SDK.
+- **Profanity Scanner**: Built-in Trie-based string matching service. Runs in Express server memory at **$0** monthly compute costs.
+
 **Architecture:**
+
 - **Whitelisted DM Conversations**: Conversations are limited to users who are connected (ACCEPTED state in `UserConnection` table) and not BLOCKED. A sorted unique compound key (`"userA.id_userB.id"`) prevents duplicate conversation records.
 - **Real-Time Sockets**: Handled via Socket.io with a Redis adapter. Sockets listen for connection handshakes (verifying JWT), room join/leave events, messaging, and typing status.
 - **Trie-based Content Moderation**: On-the-fly profanity scanner checks message body content in $O(N)$ linear time. If flagged, messages are stored with `isFlagged: true` for admin audit.
 - **FCM Push Notification Pipeline (FCM + BullMQ)**: Enqueues background jobs in BullMQ when recipients are offline, dispatching FCM notifications to wake up mobile clients.
-- **Secure File Sharing**: Integrates Cloudflare R2 ($0 egress fees, 10GB free tier) with the S3 uploads module. Uploaded attachments are served via an Express router that verifies conversation membership before streaming files.
+- **Secure File Sharing**: Integrates Cloudflare R2 with the S3 uploads module. Uploaded attachments are served via an Express router that verifies conversation membership before streaming files.
 
 **Tech Stack:** Node.js, Express, TypeScript, Prisma (PostgreSQL), Redis (ioredis + socket.io-redis), BullMQ, Firebase Admin SDK.
 
@@ -22,6 +29,7 @@
 Define database models for Conversations, Members, Messages, Message Attachments, Sensitive Words, and User Connections.
 
 **Files:**
+
 - Modify: `src/database/prisma/schema.prisma`
 - Test: `tests/database/chat.schema.test.ts`
 
@@ -35,6 +43,7 @@ Run: `npm test tests/database/chat.schema.test.ts`
 Append `Conversation`, `ConversationMember`, `Message`, `MessageAttachment`, `SensitiveWord`, and `UserConnection` models to `src/database/prisma/schema.prisma`, along with relations on `User`.
 
 Run migration:
+
 ```bash
 npm run prisma:generate
 npm run prisma:migrate -- --name add_chat_schemas
@@ -44,6 +53,7 @@ npm run prisma:migrate -- --name add_chat_schemas
 Run: `npm test tests/database/chat.schema.test.ts`
 
 **Step 5: Commit**
+
 ```bash
 git add src/database/prisma/schema.prisma tests/database/chat.schema.test.ts
 git commit -m "db: add chat and connection schema models"
@@ -56,6 +66,7 @@ git commit -m "db: add chat and connection schema models"
 Build a performant Trie structure to scan incoming chat messages for blacklisted words without blocking WebSocket threads.
 
 **Files:**
+
 - Create: `src/modules/chats/moderation.service.ts`
 - Test: `tests/modules/chats/moderation.test.ts`
 
@@ -72,6 +83,7 @@ Create Trie nodes mapping child letters in `src/modules/chats/moderation.service
 Run: `npm test tests/modules/chats/moderation.test.ts`
 
 **Step 5: Commit**
+
 ```bash
 git add src/modules/chats/moderation.service.ts tests/modules/chats/moderation.test.ts
 git commit -m "feat: implement high-performance Trie-based sensitive word scanner"
@@ -84,6 +96,7 @@ git commit -m "feat: implement high-performance Trie-based sensitive word scanne
 Register FCM tokens for Flutter clients, and send notifications in background BullMQ workers when users are offline.
 
 **Files:**
+
 - Modify: `src/jobs/worker.ts`
 - Modify: `src/modules/users/user.service.ts`
 - Modify: `src/modules/users/user.controller.ts`
@@ -104,6 +117,7 @@ Mount `PUT /api/v1/users/me/fcm` in routes. Update `notificationWorker` in `src/
 Run: `npm test tests/modules/notifications/fcm.test.ts`
 
 **Step 5: Commit**
+
 ```bash
 git add src/modules/users/ src/jobs/ tests/modules/notifications/fcm.test.ts
 git commit -m "feat: implement FCM token registration and async push queues via BullMQ"
@@ -116,6 +130,7 @@ git commit -m "feat: implement FCM token registration and async push queues via 
 Implement database operations using Prisma for direct chats, retrieving messages, and managing records. Enforce sorted key conversation mapping and whitelist connection checks.
 
 **Files:**
+
 - Create: `src/modules/chats/chat.repository.ts`
 - Create: `src/modules/chats/chat.service.ts`
 - Test: `tests/modules/chats/chat.repository.test.ts`
@@ -133,6 +148,7 @@ Implement connection-check status verification, sorted keys formatting, and text
 Run: `npm test tests/modules/chats/chat.repository.test.ts`
 
 **Step 5: Commit**
+
 ```bash
 git add src/modules/chats/chat.repository.ts src/modules/chats/chat.service.ts tests/modules/chats/chat.repository.test.ts
 git commit -m "feat: implement 1-to-1 ChatRepository with sorted unique conversation keys and whitelisting"
@@ -145,6 +161,7 @@ git commit -m "feat: implement 1-to-1 ChatRepository with sorted unique conversa
 Add validation and routing handlers for direct message endpoints, Socket.IO channels, and secure attachment delivery.
 
 **Files:**
+
 - Create: `src/modules/chats/chat.controller.ts`
 - Create: `src/modules/chats/chat.validator.ts`
 - Create: `src/modules/chats/chat.routes.ts`
@@ -167,6 +184,7 @@ Create REST/socket handlers in `src/modules/chats/` mapping `/api/v1/chats/conve
 Run: `npm test tests/modules/chats/chat.api.test.ts`
 
 **Step 5: Commit**
+
 ```bash
 git add src/modules/chats/ src/routes/index.ts src/server.ts tests/modules/chats/chat.api.test.ts
 git commit -m "feat: add 1-to-1 chat REST routes, socket listeners, and secure attachment delivery"

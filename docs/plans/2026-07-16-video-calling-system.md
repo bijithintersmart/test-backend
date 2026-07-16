@@ -4,12 +4,21 @@
 
 **Goal:** Implement a secure, low-cost 1-to-1 video calling system featuring direct WebRTC video/audio streams and optional client-side ML-driven sensitive content filtering telemetry logs.
 
+**Budget-Oriented & Free Tier Services:**
+
+- **Media Streaming**: **WebRTC P2P (Peer-to-Peer)**. Audio and video streams directly device-to-device. Server media/bandwidth cost = **$0**.
+- **STUN Server**: **Google Public STUN** (`stun:stun.l.google.com:19302`) - 100% Free.
+- **TURN Server**: **Metered.ca** (Generous **50 GB/month FREE tier** of relayed bandwidth for strict firewalls).
+- **Client-Side Moderation**: **TensorFlow Lite (TFLite)** + **NSFW-TFLite** model loaded locally on the Flutter mobile client. Avoids expensive server GPU classification. Compute cost = **$0**.
+- **Background Wakeup**: **FCM Push Notifications** (100% Free) to wake up backgrounded Flutter apps during incoming calls.
+
 **Architecture:**
+
 - **P2P Video Streaming**: Video and audio data runs browser-to-browser via WebRTC, resulting in **$0 server media/bandwidth costs**.
 - **Signaling Server**: Relays WebRTC signaling payloads (`call:start` with `type: VIDEO`, `call:accept`, `call:signal`) through Socket.io. Validates that users are whitelisted conversation members.
 - **Dynamic TURN configuration**: Dynamic credentials generation on the server side (`GET /api/v1/chats/calling/ice-servers`) to bypass symmetric NAT firewalls.
 - **FCM Push Notification (BullMQ)**: If the recipient is offline, the socket server enqueues a push notification task in **BullMQ** to wake up the Flutter app with a high-priority call invitation payload.
-- **Optional Client-Side ML Moderation (Disabled by Default)**: 
+- **Optional Client-Side ML Moderation (Disabled by Default)**:
   - To prevent server slowdowns and compute costs, video streams are scanned on the mobile client (using TensorFlow Lite / MobileNet locally on the device).
   - Call start events accept an optional `moderationEnabled: boolean` parameter.
   - If a violation is flagged on the device, the Flutter app blurs the screen and sends a socket event `call:flag` to the server. The server updates the database call log (`isFlagged: true`, `flaggedReason: reason`) for admin audits.
@@ -25,6 +34,7 @@
 Define database models and relations for video call logging and moderation flags.
 
 **Files:**
+
 - Modify: `src/database/prisma/schema.prisma`
 - Test: `tests/database/video.calling.schema.test.ts`
 
@@ -38,6 +48,7 @@ Run: `npm test tests/database/video.calling.schema.test.ts`
 Append `CallLog` model with `CallType` enum (AUDIO/VIDEO), `CallStatus`, `moderationEnabled`, `isFlagged`, and `flaggedReason` fields to `src/database/prisma/schema.prisma`. Register relations on the `User` model.
 
 Run migration:
+
 ```bash
 npm run prisma:generate
 npm run prisma:migrate -- --name add_video_call_logs
@@ -47,6 +58,7 @@ npm run prisma:migrate -- --name add_video_call_logs
 Run: `npm test tests/database/video.calling.schema.test.ts`
 
 **Step 5: Commit**
+
 ```bash
 git add src/database/prisma/schema.prisma tests/database/video.calling.schema.test.ts
 git commit -m "db: implement video call logs and moderation schemas"
@@ -59,6 +71,7 @@ git commit -m "db: implement video call logs and moderation schemas"
 Implement Socket.IO signaling event handlers, client telemetry flags, and offline call push alerts.
 
 **Files:**
+
 - Create: `src/modules/calling/calling.socket.ts`
 - Modify: `src/server.ts`
 - Test: `tests/modules/calling/video.calling.socket.test.ts`
@@ -67,6 +80,7 @@ Implement Socket.IO signaling event handlers, client telemetry flags, and offlin
 Verify forwarding of video call signals (`type: VIDEO`), enqueuing push notifications if recipient is offline, and logging telemetry flags.
 
 Create `tests/modules/calling/video.calling.socket.test.ts`:
+
 ```typescript
 import { io as ioClient, Socket } from 'socket.io-client';
 import jwt from 'jsonwebtoken';
@@ -115,6 +129,7 @@ describe('Video Calling Sockets Signaling', () => {
 Run: `npm test tests/modules/calling/video.calling.socket.test.ts`
 
 **Step 3: Write minimal implementation**
+
 1. Create `src/modules/calling/calling.socket.ts`:
    - `call:start`: Check if recipient is online. If offline, dispatch push alert via BullMQ. If online, send socket event with `moderationEnabled` flag (defaults to `false`).
    - `call:flag`: Log call telemetry flags reported by client device local ML scanners.
@@ -126,6 +141,7 @@ Run: `npm test tests/modules/calling/video.calling.socket.test.ts`
 Run: `npm test tests/modules/calling/video.calling.socket.test.ts`
 
 **Step 5: Commit**
+
 ```bash
 git add src/modules/calling/calling.socket.ts src/server.ts tests/modules/calling/video.calling.socket.test.ts
 git commit -m "feat: implement WebRTC video calling signaling sockets and client telemetry flag logs"

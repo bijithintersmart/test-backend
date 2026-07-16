@@ -4,7 +4,15 @@
 
 **Goal:** Implement a low-cost, secure 1-to-1 voice calling system using WebRTC P2P audio streaming (no video track overhead) and Socket.io signaling.
 
+**Budget-Oriented & Free Tier Services:**
+
+- **Media Streaming**: **WebRTC P2P (Peer-to-Peer)**. Audio data streams directly between mobile devices. Server bandwidth cost = **$0**.
+- **STUN Server**: **Google Public STUN** (`stun:stun.l.google.com:19302`) - 100% Free for public IP resolution.
+- **TURN Server**: **Metered.ca** (Generous **50 GB/month FREE tier** of relayed bandwidth for strict firewalls).
+- **Background Wakeup**: **FCM Push Notifications** (100% Free) to wake up backgrounded Flutter apps during incoming calls.
+
 **Architecture:**
+
 - **P2P Audio Streaming**: Audio media streams directly between clients, resulting in **$0 server bandwidth costs**.
 - **Signaling Channel**: Handles SDP offers, answers, and ICE candidate exchanges securely through Socket.io. Sockets verify that both caller and receiver are conversation members.
 - **Dynamic TURN Access**: Generates time-limited credentials dynamically via a secure endpoint (`GET /api/v1/chats/calling/ice-servers`) using a shared secret hash (HMAC-SHA1) to bypass firewalls without exposing permanent API keys.
@@ -22,6 +30,7 @@
 Define database models and relations for voice call logging.
 
 **Files:**
+
 - Modify: `src/database/prisma/schema.prisma`
 - Test: `tests/database/calling.schema.test.ts`
 
@@ -35,6 +44,7 @@ Run: `npm test tests/database/calling.schema.test.ts`
 Append `CallLog` model with enum values `CallType (AUDIO, VIDEO)` and `CallStatus` to `src/database/prisma/schema.prisma`. Register relations on the `User` model.
 
 Run migration:
+
 ```bash
 npm run prisma:generate
 npm run prisma:migrate -- --name add_call_logs
@@ -44,6 +54,7 @@ npm run prisma:migrate -- --name add_call_logs
 Run: `npm test tests/database/calling.schema.test.ts`
 
 **Step 5: Commit**
+
 ```bash
 git add src/database/prisma/schema.prisma tests/database/calling.schema.test.ts
 git commit -m "db: implement call logs schema structures"
@@ -56,6 +67,7 @@ git commit -m "db: implement call logs schema structures"
 Expose secure dynamic TURN access credentials for client connections to bypass symmetric NAT firewalls.
 
 **Files:**
+
 - Create: `src/modules/calling/calling.controller.ts`
 - Create: `src/modules/calling/calling.routes.ts`
 - Modify: `src/routes/index.ts`
@@ -65,6 +77,7 @@ Expose secure dynamic TURN access credentials for client connections to bypass s
 Assert that requesting ICE config returns short-lived time-sensitive credentials.
 
 Create `tests/modules/calling/ice.api.test.ts`:
+
 ```typescript
 import request from 'supertest';
 import app from '../../../src/app';
@@ -92,6 +105,7 @@ describe('ICE Server Config REST API', () => {
 Run: `npm test tests/modules/calling/ice.api.test.ts`
 
 **Step 3: Write minimal implementation**
+
 1. Implement `CallingController` in `src/modules/calling/calling.controller.ts` to compute HMAC-SHA1 signature username/password pairs for your coturn or Metered.ca TURN server.
 2. Setup routes and mount router under `src/routes/index.ts`.
 
@@ -99,6 +113,7 @@ Run: `npm test tests/modules/calling/ice.api.test.ts`
 Run: `npm test tests/modules/calling/ice.api.test.ts`
 
 **Step 5: Commit**
+
 ```bash
 git add src/modules/calling/ src/routes/index.ts tests/modules/calling/ice.api.test.ts
 git commit -m "feat: implement dynamic ICE server credentials API endpoint"
@@ -111,6 +126,7 @@ git commit -m "feat: implement dynamic ICE server credentials API endpoint"
 Implement Socket.IO signaling event handlers and offline call push alerts.
 
 **Files:**
+
 - Create: `src/modules/calling/calling.socket.ts`
 - Modify: `src/server.ts`
 - Test: `tests/modules/calling/calling.socket.test.ts`
@@ -119,6 +135,7 @@ Implement Socket.IO signaling event handlers and offline call push alerts.
 Verify forwarding of voice calls signaling SDP offer/answers and candidates, and enqueuing background pushes if the receiver is offline.
 
 Create `tests/modules/calling/calling.socket.test.ts`:
+
 ```typescript
 import { io as ioClient, Socket } from 'socket.io-client';
 import jwt from 'jsonwebtoken';
@@ -166,6 +183,7 @@ describe('Calling Sockets Signaling', () => {
 Run: `npm test tests/modules/calling/calling.socket.test.ts`
 
 **Step 3: Write minimal implementation**
+
 1. Create `src/modules/calling/calling.socket.ts`:
    - `call:start`: Check if recipient is online in Redis. If offline, dispatch push alert via BullMQ. If online, send socket event.
    - `call:accept`: Relay response SDP.
@@ -178,6 +196,7 @@ Run: `npm test tests/modules/calling/calling.socket.test.ts`
 Run: `npm test tests/modules/calling/calling.socket.test.ts`
 
 **Step 5: Commit**
+
 ```bash
 git add src/modules/calling/calling.socket.ts src/server.ts tests/modules/calling/calling.socket.test.ts
 git commit -m "feat: implement WebRTC voice calling signaling sockets and offline call notifications"

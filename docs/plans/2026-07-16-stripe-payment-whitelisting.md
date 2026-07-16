@@ -4,7 +4,14 @@
 
 **Goal:** Integrate Stripe payments so that communication (chat, voice calling, and video calling) is unlocked for the initiator (guest) and target user (partner) only after a successful connection payment checkout.
 
+**Budget-Oriented & Free Tier Services:**
+
+- **Payment Processor**: **Stripe** (Pay-as-you-go: **$0 setup or monthly fees**, 2.9% + $0.30 per successful transaction). You only pay when you make a sale.
+- **Backend SDK**: Official **stripe** package for Node.js.
+- **Flutter UI Integration**: **flutter_stripe** (pub.dev) supporting secure native iOS and Android Stripe payment sheet triggers.
+
 **Architecture:**
+
 - **Connection Pending State**: When a user attempts to chat or call another user without an existing connection, a `UserConnection` record is generated in a `WAITING_PAYMENT` state.
 - **Stripe Checkout Session**: Initiating communication redirects the user to a secure Stripe checkout session (`POST /api/v1/payments/checkout`). Session metadata securely locks the buyer's ID and target partner's ID.
 - **Secure Webhook Verification**: Stripe triggers a webhook on `/api/v1/payments/webhook`. The endpoint strictly verifies signatures using `stripe.webhooks.constructEvent` with the raw request buffer to prevent spoofing.
@@ -56,6 +63,7 @@ sequenceDiagram
 Add payment logging models and update connection state values.
 
 **Files:**
+
 - Modify: `src/database/prisma/schema.prisma`
 - Test: `tests/database/payment.schema.test.ts`
 
@@ -63,6 +71,7 @@ Add payment logging models and update connection state values.
 Create a test asserting connection updates to `WAITING_PAYMENT` status and creation of `PaymentLog` records.
 
 Create `tests/database/payment.schema.test.ts`:
+
 ```typescript
 import { db } from '../../src/database/db';
 
@@ -100,7 +109,9 @@ describe('Payment Whitelisting Database Schema', () => {
 Run: `npm test tests/database/payment.schema.test.ts`
 
 **Step 3: Write minimal implementation**
+
 1. Append the `PaymentLog` model to `src/database/prisma/schema.prisma`:
+
 ```prisma
 model PaymentLog {
   id              String         @id @default(uuid()) @db.Uuid
@@ -119,11 +130,13 @@ model PaymentLog {
 }
 ```
 
-2. Update relations:
+1. Update relations:
+
 - Add `paymentLogs PaymentLog[]` to the `User` model.
 - Add `paymentLogs PaymentLog[]` to the `UserConnection` model.
 
 Run schema migration:
+
 ```bash
 npm run prisma:generate
 npm run prisma:migrate -- --name add_payment_schemas
@@ -133,6 +146,7 @@ npm run prisma:migrate -- --name add_payment_schemas
 Run: `npm test tests/database/payment.schema.test.ts`
 
 **Step 5: Commit**
+
 ```bash
 git add src/database/prisma/schema.prisma tests/database/payment.schema.test.ts
 git commit -m "db: implement PaymentLog schema and WAITING_PAYMENT status mapping"
@@ -145,6 +159,7 @@ git commit -m "db: implement PaymentLog schema and WAITING_PAYMENT status mappin
 Install the Stripe Node SDK and configure environment parameters for secure keys.
 
 **Files:**
+
 - Modify: `src/config/env.ts`
 - Modify: `.env.example`
 - Modify: `package.json`
@@ -153,7 +168,9 @@ Install the Stripe Node SDK and configure environment parameters for secure keys
 Run: `npm install stripe`
 
 **Step 2: Write minimal implementation**
+
 1. Update `src/config/env.ts` configurations:
+
 ```typescript
 // Inside env.ts, append:
 STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
@@ -162,7 +179,8 @@ STRIPE_CONNECTION_PRICE_ID: process.env.STRIPE_CONNECTION_PRICE_ID || '', // Pri
 CLIENT_URL: process.env.CLIENT_URL || 'http://localhost:4000', // Redirect Flutter app target deep-links
 ```
 
-2. Update `.env` and `.env.example`:
+1. Update `.env` and `.env.example`:
+
 ```env
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
@@ -171,6 +189,7 @@ CLIENT_URL=myapp://payment-redirect
 ```
 
 **Step 3: Commit**
+
 ```bash
 git add src/config/env.ts .env.example package.json
 git commit -m "config: configure stripe sdk environment variables"
@@ -183,6 +202,7 @@ git commit -m "config: configure stripe sdk environment variables"
 Implement checkout endpoints to redirect standard user connection requests to Stripe Checkout.
 
 **Files:**
+
 - Create: `src/modules/payments/payment.service.ts`
 - Create: `src/modules/payments/payment.controller.ts`
 - Create: `src/modules/payments/payment.validator.ts`
@@ -197,7 +217,9 @@ Create `tests/modules/payments/checkout.api.test.ts` checking that requesting a 
 Run: `npm test tests/modules/payments/checkout.api.test.ts`
 
 **Step 3: Write minimal implementation**
+
 1. Create `src/modules/payments/payment.service.ts`:
+
 ```typescript
 import Stripe from 'stripe';
 import { env } from '../../config/env';
@@ -251,12 +273,13 @@ export class PaymentService {
 export const paymentService = new PaymentService();
 ```
 
-2. Implement Controller, Zod Validator, and routes mapping in `src/modules/payments/`. Mount router under `/payments` prefix in `src/routes/index.ts`.
+1. Implement Controller, Zod Validator, and routes mapping in `src/modules/payments/`. Mount router under `/payments` prefix in `src/routes/index.ts`.
 
 **Step 4: Run test to verify it passes**
 Run: `npm test tests/modules/payments/checkout.api.test.ts`
 
 **Step 5: Commit**
+
 ```bash
 git add src/modules/payments/ src/routes/index.ts tests/modules/payments/checkout.api.test.ts
 git commit -m "feat: implement Stripe checkout session generation for connections"
@@ -269,6 +292,7 @@ git commit -m "feat: implement Stripe checkout session generation for connection
 Process incoming Stripe webhook payloads. Validate signatures using Stripe secrets, update connection status to `ACCEPTED` in ACID transactions, and enqueue push triggers.
 
 **Files:**
+
 - Modify: `src/modules/payments/payment.routes.ts`
 - Modify: `src/modules/payments/payment.controller.ts`
 - Modify: `src/app.ts`
@@ -281,7 +305,9 @@ Create `tests/modules/payments/webhook.test.ts` mock-submitting `checkout.sessio
 Run: `npm test tests/modules/payments/webhook.test.ts`
 
 **Step 3: Write minimal implementation**
+
 1. Update `src/app.ts` to support raw body parsing for the Webhook endpoint (required by Stripe to construct cryptographic signatures):
+
 ```typescript
 // Add inside src/app.ts, BEFORE general body parsers:
 app.use(
@@ -290,7 +316,8 @@ app.use(
 );
 ```
 
-2. Add the webhook route and controller method in `src/modules/payments/`:
+1. Add the webhook route and controller method in `src/modules/payments/`:
+
 ```typescript
 import Stripe from 'stripe';
 import { db } from '../../database/db';
@@ -371,6 +398,7 @@ async handleWebhook(req: Request, res: Response, next: NextFunction) {
 Run: `npm test tests/modules/payments/webhook.test.ts`
 
 **Step 5: Commit**
+
 ```bash
 git add src/modules/payments/ src/app.ts tests/modules/payments/webhook.test.ts
 git commit -m "feat: add secure Stripe webhook validation and payment status trigger hooks"
