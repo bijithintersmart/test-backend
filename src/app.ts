@@ -7,11 +7,44 @@ import pinoHttp from 'pino-http';
 import { rateLimiter } from './core/security/rate-limiter';
 import { logger } from './core/logger/logger';
 import { errorHandler } from './core/middleware/error.middleware';
-import { NotFoundError } from './core/errors/custom-errors';
+import { NotFoundError, MethodNotAllowedError } from './core/errors/custom-errors';
 import { setupSwagger } from './config/swagger';
 import routesV1 from './routes';
 
 const app = express();
+
+// Helper to extract allowed HTTP methods for a path
+function getAllowedMethods(router: any, path: string): string[] {
+  const methods: string[] = [];
+
+  function traverse(currentRouter: any, currentPath: string) {
+    if (!currentRouter || !currentRouter.stack) return;
+
+    for (const layer of currentRouter.stack) {
+      if (layer.route) {
+        if (layer.match(currentPath)) {
+          const routeMethods = Object.keys(layer.route.methods)
+            .filter((m) => layer.route.methods[m])
+            .map((m) => m.toUpperCase());
+          methods.push(...routeMethods);
+        }
+      } else if (layer.name === 'router' && layer.handle) {
+        if (layer.match(currentPath)) {
+          const match = layer.regexp.exec(currentPath);
+          if (match) {
+            const prefix = match[0];
+            const relativePath = currentPath.slice(prefix.length) || '/';
+            const formattedPath = relativePath.startsWith('/') ? relativePath : '/' + relativePath;
+            traverse(layer.handle, formattedPath);
+          }
+        }
+      }
+    }
+  }
+
+  traverse(router, path);
+  return Array.from(new Set(methods)).sort();
+}
 
 // 1. Security Headers & CORS
 app.use(helmet());
@@ -54,8 +87,12 @@ app.use('/uploads', express.static('uploads'));
 // 9. API Routing
 app.use('/api/v1', routesV1);
 
-// 10. Catch 404
-app.use((_req: Request, _res: Response, next: NextFunction) => {
+// 10. Catch 404 / 405
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  const allowed = getAllowedMethods((app as any)._router, req.path);
+  if (allowed.length > 0) {
+    return next(new MethodNotAllowedError(`Method ${req.method} not allowed for this route. Allowed methods: ${allowed.join(', ')}`));
+  }
   next(new NotFoundError('API Route Not Found'));
 });
 

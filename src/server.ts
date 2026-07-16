@@ -1,13 +1,13 @@
-import http from 'http';
-import { Server as SocketIOServer } from 'socket.io';
-import app from './app';
-import { env } from './config/env';
-import { connectDb, db } from './database/db';
-import { redisService } from './services/redis.service';
-import { logger } from './core/logger/logger';
+import http from "http";
+import { Server as SocketIOServer } from "socket.io";
+import app from "./app";
+import { env } from "./config/env";
+import { connectDb, db } from "./database/db";
+import { redisService } from "./services/redis.service";
+import { logger } from "./core/logger/logger";
 
 // BullMQ Workers need to be imported so they register and begin processing
-import './jobs/worker';
+import "./jobs/worker";
 
 const port = env.PORT || 3000;
 const server = http.createServer(app);
@@ -15,15 +15,15 @@ const server = http.createServer(app);
 // Initialize Socket.IO Server (Ready for real-time channels)
 const io = new SocketIOServer(server, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST'],
+    origin: "*",
+    methods: ["GET", "POST"],
   },
 });
 
-io.on('connection', (socket) => {
+io.on("connection", (socket) => {
   logger.info(`🔌 Real-time client connected: ${socket.id}`);
 
-  socket.on('disconnect', () => {
+  socket.on("disconnect", () => {
     logger.info(`🔌 Real-time client disconnected: ${socket.id}`);
   });
 });
@@ -45,7 +45,7 @@ async function bootstrap() {
       logger.info(`📚 Swagger docs available at http://localhost:${port}/docs`);
     });
   } catch (error) {
-    logger.fatal(error as Error, '❌ Bootstrap startup failed');
+    logger.fatal(error as Error, "❌ Bootstrap startup failed");
     process.exit(1);
   }
 }
@@ -56,7 +56,7 @@ const handleShutdown = async (signal: string) => {
 
   // Close HTTP server to stop accepting new requests
   server.close(() => {
-    logger.info('HTTP server closed.');
+    logger.info("HTTP server closed.");
   });
 
   try {
@@ -65,17 +65,17 @@ const handleShutdown = async (signal: string) => {
 
     // Disconnect Prisma
     await db.$disconnect();
-    logger.info('Database connection closed.');
+    logger.info("Database connection closed.");
 
-    logger.info('Graceful shutdown completed. Exiting process.');
+    logger.info("Graceful shutdown completed. Exiting process.");
     process.exit(0);
   } catch (error) {
-    logger.error(error as Error, 'Error during graceful shutdown');
+    logger.error(error as Error, "Error during graceful shutdown");
     process.exit(1);
   }
 };
 
-process.on('SIGTERM', () => handleShutdown('SIGTERM'));
-process.on('SIGINT', () => handleShutdown('SIGINT'));
+process.on("SIGTERM", () => handleShutdown("SIGTERM"));
+process.on("SIGINT", () => handleShutdown("SIGINT"));
 
 bootstrap();

@@ -88,3 +88,14 @@ export class InternalServerError extends AppError {
     return { message: this.message };
   }
 }
+
+export class MethodNotAllowedError extends AppError {
+  readonly statusCode = 405;
+  constructor(message: string = 'Method Not Allowed') {
+    super(message);
+  }
+  serializeErrors() {
+    return { message: this.message };
+  }
+}
+

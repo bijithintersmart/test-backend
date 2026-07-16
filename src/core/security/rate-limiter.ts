@@ -21,7 +21,6 @@ export const rateLimiter = rateLimit({
       success: false,
       message: 'Too many requests, please try again later.',
       errors: [{ message: 'Rate limit exceeded' }],
-      timestamp: new Date().toISOString(),
     });
   },
 });
@@ -29,20 +28,22 @@ export const rateLimiter = rateLimit({
 // A stricter rate limiter for sensitive endpoints (Auth, Login, Password resets)
 export const strictRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit to 5 requests per window
+  max: 15, // Limit to 5 requests per window
   standardHeaders: true,
   legacyHeaders: false,
   store: new RedisStore({
     // @ts-ignore
-    sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)),
+    sendCommand: (...args: string[]) =>
+      redisClient.call(args[0], ...args.slice(1)),
   }),
   handler: (req, res, _next, options) => {
-    logger.warn(`Strict rate limit exceeded for IP: ${req.ip} on auth URL: ${req.originalUrl}`);
+    logger.warn(
+      `Strict rate limit exceeded for IP: ${req.ip} on auth URL: ${req.originalUrl}`,
+    );
     res.status(options.statusCode).json({
       success: false,
-      message: 'Too many login attempts. Please try again after 15 minutes.',
-      errors: [{ message: 'Brute-force protection triggered' }],
-      timestamp: new Date().toISOString(),
+      message: "Too many login attempts. Please try again after 15 minutes.",
+      errors: [{ message: "Brute-force protection triggered" }],
     });
   },
 });

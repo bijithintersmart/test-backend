@@ -8,8 +8,6 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction
 ) => {
-  const timestamp = new Date().toISOString();
-
   if (err instanceof AppError) {
     logger.warn({
       msg: `AppError [${err.constructor.name}]: ${err.message}`,
@@ -24,7 +22,6 @@ export const errorHandler = (
       success: false,
       message: serialized.message,
       errors: serialized.fields || [],
-      timestamp,
     });
   }
 
@@ -40,6 +37,5 @@ export const errorHandler = (
     success: false,
     message: 'Internal Server Error',
     errors: [{ message: 'An unexpected error occurred on the server' }],
-    timestamp,
   });
 };

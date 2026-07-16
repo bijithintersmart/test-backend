@@ -19,17 +19,17 @@ const router = Router();
 
 // Apply brute-force protection to sensitive authentication paths
 router.post(
-  '/register',
-  strictRateLimiter,
+  "/register",
+  // strictRateLimiter,
   validateRequest(registerSchema),
-  authController.register
+  authController.register,
 );
 
 router.post(
-  '/login',
-  strictRateLimiter,
+  "/login",
+  // strictRateLimiter,
   validateRequest(loginSchema),
-  authController.login
+  authController.login,
 );
 
 router.post(
@@ -53,10 +53,10 @@ router.post(
 );
 
 router.post(
-  '/resend-otp',
-  strictRateLimiter,
+  "/resend-otp",
+  // strictRateLimiter,
   validateRequest(resendOtpSchema),
-  authController.resendOtp
+  authController.resendOtp,
 );
 
 router.post(

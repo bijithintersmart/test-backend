@@ -32,8 +32,6 @@ const options: swaggerJSDoc.Options = {
             success: { type: 'boolean', example: true },
             message: { type: 'string', example: 'Action completed successfully' },
             data: { type: 'object' },
-            meta: { type: 'object' },
-            timestamp: { type: 'string', format: 'date-time' },
           },
         },
         StandardErrorResponse: {
@@ -51,20 +49,30 @@ const options: swaggerJSDoc.Options = {
                 },
               },
             },
-            timestamp: { type: 'string', format: 'date-time' },
           },
         },
       },
     },
   },
-  apis: ['./src/modules/**/*.routes.ts', './src/modules/**/*.routes.js'],
+  apis: [
+    './src/modules/**/*.routes.ts',
+    './src/modules/**/*.routes.js',
+    './dist/modules/**/*.routes.js'
+  ],
 };
 
 const swaggerSpec = swaggerJSDoc(options);
 
 export const setupSwagger = (app: Express) => {
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+  app.use('/api/v1/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+  
   app.get('/docs.json', (_req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(swaggerSpec);
+  });
+
+  app.get('/api/v1/docs.json', (_req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(swaggerSpec);
   });

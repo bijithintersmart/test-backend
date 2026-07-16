@@ -77,7 +77,7 @@ export class UserService {
 
   // Remove sensitive details from User object
   sanitizeUser(user: any) {
-    const { password, deletedAt, ...sanitized } = user;
+    const { password, deletedAt, lastLogin, createdAt, updatedAt, ...sanitized } = user;
     return sanitized;
   }
 }
