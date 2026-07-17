@@ -1,54 +1,48 @@
 import pino from 'pino';
 import { env } from '../../config/env';
 import path from 'path';
+import pretty from 'pino-pretty';
 
 const isProduction = env.NODE_ENV === 'production';
 const isTest = env.NODE_ENV === 'test';
 
-// Define the transport targets
-const targets: pino.TransportTargetOptions[] = [];
+const streams: pino.StreamEntry[] = [];
 
-// 1. File transport for errors (only enabled in dev and production, disabled in test)
-if (!isTest) {
-  targets.push({
-    target: 'pino/file',
-    level: 'error',
-    options: {
-      destination: path.join(process.cwd(), 'logs', 'error.log'),
-      mkdir: true,
-    },
-  });
-}
-
-// 2. Console/Stdout transport
 if (isTest) {
-  // Silent console during test runs
-  targets.push({
-    target: 'pino/file',
-    level: 'silent',
-    options: { destination: 1 },
-  });
-} else if (!isProduction) {
-  // Pretty-print console during local development
-  targets.push({
-    target: 'pino-pretty',
-    level: process.env.LOG_LEVEL || 'info',
-    options: {
-      colorize: true,
-      translateTime: 'SYS:yyyy-mm-dd HH:MM:ss',
-      ignore: 'pid,hostname',
-    },
+  streams.push({
+    stream: pino.destination({ dest: 1, sync: true }),
   });
 } else {
-  // Standard JSON output for production cloud environments (stdout)
-  targets.push({
-    target: 'pino/file',
-    level: process.env.LOG_LEVEL || 'info',
-    options: { destination: 1 }, // stdout
+  // 1. File transport for errors (only enabled in dev and production, disabled in test)
+  streams.push({
+    level: 'error' as pino.Level,
+    stream: pino.destination({
+      dest: path.join(process.cwd(), 'logs', 'error.log'),
+      mkdir: true,
+      sync: true, // Write synchronously to ensure errors are written before process exits
+    }),
   });
-}
 
-const transport = pino.transport({ targets });
+  // 2. Console/Stdout transport
+  const consoleLevel = (process.env.LOG_LEVEL || 'info') as pino.Level;
+  if (!isProduction) {
+    // Pretty-print console during local development
+    streams.push({
+      level: consoleLevel,
+      stream: pretty({
+        colorize: true,
+        translateTime: 'SYS:yyyy-mm-dd HH:MM:ss',
+        ignore: 'pid,hostname',
+      }),
+    });
+  } else {
+    // Standard JSON output for production cloud environments (stdout)
+    streams.push({
+      level: consoleLevel,
+      stream: pino.destination({ dest: 1, sync: true }), // stdout
+    });
+  }
+}
 
 export const logger = pino(
   {
@@ -65,6 +59,5 @@ export const logger = pino(
       error: pino.stdSerializers.err,
     },
   },
-  transport
+  pino.multistream(streams)
 );
-

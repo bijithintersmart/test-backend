@@ -2,6 +2,8 @@ import { PrismaClient } from '@prisma/client';
 import { env } from '../config/env';
 import { logger } from '../core/logger/logger';
 import { uuidv7 } from '../core/utils/uuid';
+import { handleDockerError } from '../core/utils/docker';
+
 
 const isDev = env.NODE_ENV === 'development';
 
@@ -49,6 +51,7 @@ export const connectDb = async () => {
     await db.$connect();
     logger.info('🐘 Database connected successfully via Prisma');
   } catch (error) {
+    handleDockerError('Database (Postgres)', error);
     logger.error(error as Error, '❌ Failed to connect to the database');
     process.exit(1);
   }

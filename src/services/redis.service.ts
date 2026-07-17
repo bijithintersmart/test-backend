@@ -35,6 +35,43 @@ class RedisService {
     return this.client;
   }
 
+  async waitForReady(timeoutMs: number = 3000): Promise<void> {
+    if (!this.client) {
+      throw new Error('Redis client not initialized');
+    }
+
+    const client = this.client;
+
+    if (client.status === 'ready') {
+      return;
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error('Redis connection timeout'));
+      }, timeoutMs);
+
+      const onReady = () => {
+        cleanup();
+        resolve();
+      };
+
+      const onError = (_err: Error) => {
+        // We let the timeout handle rejection to allow potential connection retries
+      };
+
+      const cleanup = () => {
+        clearTimeout(timeout);
+        client.removeListener('ready', onReady);
+        client.removeListener('error', onError);
+      };
+
+      client.on('ready', onReady);
+      client.on('error', onError);
+    });
+  }
+
   async get(key: string): Promise<string | null> {
     return this.client?.get(key) || null;
   }

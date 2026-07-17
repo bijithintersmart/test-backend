@@ -5,9 +5,7 @@ import { env } from "./config/env";
 import { connectDb, db } from "./database/db";
 import { redisService } from "./services/redis.service";
 import { logger } from "./core/logger/logger";
-
-// BullMQ Workers need to be imported so they register and begin processing
-import "./jobs/worker";
+import { checkDockerAndExitIfInactive, handleDockerError } from "./core/utils/docker";
 
 const port = env.PORT || 3000;
 const server = http.createServer(app);
@@ -33,13 +31,29 @@ export { io };
 
 async function bootstrap() {
   try {
+    // 0. Check if Docker is installed but inactive in local development
+    checkDockerAndExitIfInactive();
+
     // 1. Establish database connection
     await connectDb();
 
     // 2. Establish Redis connection
     redisService.connect();
+    
+    // In development mode, check if Redis is reachable to prevent BullMQ connection floods
+    if (env.NODE_ENV !== 'production') {
+      try {
+        await redisService.waitForReady(3000);
+      } catch (error) {
+        handleDockerError('Redis', error);
+        throw error;
+      }
+    }
 
-    // 3. Start HTTP server listening
+    // 3. Register BullMQ workers dynamically only after database & Redis connections are verified
+    await import("./jobs/worker");
+
+    // 4. Start HTTP server listening
     server.listen(port, () => {
       logger.info(`🚀 Server running in ${env.NODE_ENV} mode on port ${port}`);
       logger.info(`📚 Swagger docs available at http://localhost:${port}/docs`);

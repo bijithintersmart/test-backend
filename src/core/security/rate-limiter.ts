@@ -4,8 +4,6 @@ import { env } from '../../config/env';
 import { redisService } from '../../services/redis.service';
 import { logger } from '../logger/logger';
 
-const redisClient = redisService.getClient();
-
 export const rateLimiter = rateLimit({
   windowMs: env.RATE_LIMIT_WINDOW_MS,
   max: env.RATE_LIMIT_MAX,
@@ -13,7 +11,7 @@ export const rateLimiter = rateLimit({
   legacyHeaders: false,
   store: new RedisStore({
     // @ts-ignore
-    sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)),
+    sendCommand: (...args: string[]) => redisService.getClient().call(args[0], ...args.slice(1)),
   }),
   handler: (req, res, _next, options) => {
     logger.warn(`Rate limit exceeded for IP: ${req.ip} on URL: ${req.originalUrl}`);
@@ -34,7 +32,7 @@ export const strictRateLimiter = rateLimit({
   store: new RedisStore({
     // @ts-ignore
     sendCommand: (...args: string[]) =>
-      redisClient.call(args[0], ...args.slice(1)),
+      redisService.getClient().call(args[0], ...args.slice(1)),
   }),
   handler: (req, res, _next, options) => {
     logger.warn(
