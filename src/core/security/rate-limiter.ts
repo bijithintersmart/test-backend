@@ -25,8 +25,8 @@ export const rateLimiter = rateLimit({
 
 // A stricter rate limiter for sensitive endpoints (Auth, Login, Password resets)
 export const strictRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 15, // Limit to 5 requests per window
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 5, // Limit to 5 requests per window
   standardHeaders: true,
   legacyHeaders: false,
   store: new RedisStore({
@@ -40,7 +40,7 @@ export const strictRateLimiter = rateLimit({
     );
     res.status(options.statusCode).json({
       success: false,
-      message: "Too many login attempts. Please try again after 15 minutes.",
+      message: "Too many login attempts. Please try again after 5 minutes.",
       errors: [{ message: "Brute-force protection triggered" }],
     });
   },
