@@ -20,6 +20,7 @@
     "format": "prettier --write 'src/**/*.ts'"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^7.3.0",
     "@prisma/client": "^5.14.0",
     "argon2": "^0.40.1",
     "bullmq": "^5.8.3",

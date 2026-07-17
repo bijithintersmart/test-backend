@@ -1,67 +1,30 @@
-import swaggerJSDoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import { Express } from 'express';
 import { env } from './env';
+import { OpenApiGeneratorV3 } from '@asteasolutions/zod-to-openapi';
+import { registry } from './openapi-registry';
 
-const options: swaggerJSDoc.Options = {
-  definition: {
-    openapi: '3.0.0',
-    info: {
-      title: 'Enterprise Backend API Specs',
-      version: '1.0.0',
-      description: 'Production-ready Node.js + Express.js API documentation',
-    },
-    servers: [
-      {
-        url: `http://localhost:${env.PORT}/api/v1`,
-        description: 'V1 API Server',
-      },
-    ],
-    components: {
-      securitySchemes: {
-        bearerAuth: {
-          type: 'http',
-          scheme: 'bearer',
-          bearerFormat: 'JWT',
-        },
-      },
-      schemas: {
-        StandardSuccessResponse: {
-          type: 'object',
-          properties: {
-            success: { type: 'boolean', example: true },
-            message: { type: 'string', example: 'Action completed successfully' },
-            data: { type: 'object' },
-          },
-        },
-        StandardErrorResponse: {
-          type: 'object',
-          properties: {
-            success: { type: 'boolean', example: false },
-            message: { type: 'string', example: 'Validation Failed' },
-            errors: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  field: { type: 'string', example: 'email' },
-                  message: { type: 'string', example: 'Invalid email address' },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
+// Import swagger definitions to register them to the registry
+import '../modules/auth/auth.swagger';
+import '../modules/health/health.swagger';
+
+// Generate standard OpenAPI v3 document
+const generator = new OpenApiGeneratorV3(registry.definitions);
+
+const swaggerSpec = generator.generateDocument({
+  openapi: '3.0.0',
+  info: {
+    title: 'Enterprise Backend API Specs',
+    version: '1.0.0',
+    description: 'Production-ready Node.js + Express.js API documentation',
   },
-  apis: [
-    './src/modules/**/*.routes.ts',
-    './src/modules/**/*.routes.js',
-    './dist/modules/**/*.routes.js'
+  servers: [
+    {
+      url: `http://localhost:${env.PORT}/api/v1`,
+      description: 'V1 API Server',
+    },
   ],
-};
-
-const swaggerSpec = swaggerJSDoc(options);
+});
 
 export const setupSwagger = (app: Express) => {
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

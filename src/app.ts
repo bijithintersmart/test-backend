@@ -65,6 +65,9 @@ app.use(
 // 2. Performance & Compression
 app.use(compression());
 
+// Mount Interactive Swagger API Documentation (before rate limiting so docs load freely)
+setupSwagger(app);
+
 // 3. Rate Limiting (Applied globally)
 app.use(rateLimiter);
 
@@ -160,9 +163,6 @@ app.use(
 );
 
 
-
-// 7. Mount Interactive Swagger API Documentation
-setupSwagger(app);
 
 // 8. Serve static uploads (for local storage uploads fallback)
 app.use('/uploads', express.static('uploads'));

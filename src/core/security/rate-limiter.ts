@@ -9,10 +9,19 @@ export const rateLimiter = rateLimit({
   max: env.RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: false, // Disable validations to prevent ERL_DOUBLE_COUNT and proxy warning logs
   store: new RedisStore({
     // @ts-ignore
     sendCommand: (...args: string[]) => redisService.getClient().call(args[0], ...args.slice(1)),
   }),
+  skip: () => {
+    // By default, skip rate limiting in local development to prevent blocking developers.
+    // Can be forced to run by setting ENABLE_RATE_LIMIT=true in .env
+    if (env.NODE_ENV === 'development' && process.env.ENABLE_RATE_LIMIT !== 'true') {
+      return true;
+    }
+    return false;
+  },
   handler: (req, res, _next, options) => {
     logger.warn(`Rate limit exceeded for IP: ${req.ip} on URL: ${req.originalUrl}`);
     res.status(options.statusCode).json({
@@ -29,11 +38,20 @@ export const strictRateLimiter = rateLimit({
   max: 5, // Limit to 5 requests per window
   standardHeaders: true,
   legacyHeaders: false,
+  validate: false, // Disable validations to prevent ERL_DOUBLE_COUNT and proxy warning logs
   store: new RedisStore({
     // @ts-ignore
     sendCommand: (...args: string[]) =>
       redisService.getClient().call(args[0], ...args.slice(1)),
   }),
+  skip: () => {
+    // By default, skip strict rate limiting in local development to prevent blocking developers.
+    // Can be forced to run by setting ENABLE_RATE_LIMIT=true in .env
+    if (env.NODE_ENV === 'development' && process.env.ENABLE_RATE_LIMIT !== 'true') {
+      return true;
+    }
+    return false;
+  },
   handler: (req, res, _next, options) => {
     logger.warn(
       `Strict rate limit exceeded for IP: ${req.ip} on auth URL: ${req.originalUrl}`,
