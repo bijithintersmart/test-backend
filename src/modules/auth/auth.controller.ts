@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { authService } from './auth.service';
 import { sendSuccess } from '../../core/utils/response';
 import { BadRequestError } from '../../core/errors/custom-errors';
+import { env } from '../../config/env';
 
 export class AuthController {
   async register(req: Request, res: Response, next: NextFunction) {
@@ -99,6 +100,10 @@ export class AuthController {
 
   async refresh(req: Request, res: Response, next: NextFunction) {
     try {
+      if (!env.JWT_REFRESH_ENABLED) {
+        throw new BadRequestError('Refresh tokens are disabled');
+      }
+
       const { refreshToken } = req.body;
       if (!refreshToken) {
         throw new BadRequestError('Refresh token is required');

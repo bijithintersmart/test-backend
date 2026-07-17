@@ -25,9 +25,9 @@ export const verifyPassword = async (password: string, hash: string): Promise<bo
   }
 };
 
-export const generateAccessToken = (payload: TokenPayload): string => {
+export const generateAccessToken = (payload: TokenPayload, expiresIn?: string): string => {
   return jwt.sign(payload, env.JWT_ACCESS_SECRET, {
-    expiresIn: env.JWT_ACCESS_EXPIRATION as any,
+    expiresIn: expiresIn || (env.JWT_ACCESS_EXPIRATION as any),
   });
 };
 

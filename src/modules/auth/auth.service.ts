@@ -16,6 +16,7 @@ import {
   NotFoundError,
 } from '../../core/errors/custom-errors';
 import { logger } from '../../core/logger/logger';
+import { env } from '../../config/env';
 
 export class AuthService {
   private authRepository = new AuthRepository();
@@ -135,15 +136,22 @@ export class AuthService {
 
     // Generate Tokens
     const roles = user.userRoles.map((ur) => ur.role.name);
-    const accessToken = generateAccessToken({
-      userId: user.id,
-      email: user.email,
-      roles,
-    });
+    const accessTokenExpiry = env.JWT_REFRESH_ENABLED ? undefined : '7d';
+    const accessToken = generateAccessToken(
+      {
+        userId: user.id,
+        email: user.email,
+        roles,
+      },
+      accessTokenExpiry
+    );
 
-    const refreshTokenString = generateRefreshToken(user.id);
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-    await this.authRepository.saveRefreshToken(user.id, refreshTokenString, expiresAt);
+    let refreshTokenString: string | undefined;
+    if (env.JWT_REFRESH_ENABLED) {
+      refreshTokenString = generateRefreshToken(user.id);
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      await this.authRepository.saveRefreshToken(user.id, refreshTokenString, expiresAt);
+    }
 
     // Queue Login Alert Email
     await emailQueue.add('send-login-alert', {
@@ -164,7 +172,7 @@ export class AuthService {
       user: this.userService.sanitizeUser(user),
       tokens: {
         accessToken,
-        refreshToken: refreshTokenString,
+        ...(env.JWT_REFRESH_ENABLED && { refreshToken: refreshTokenString }),
       },
     };
   }
@@ -292,6 +300,10 @@ export class AuthService {
   }
 
   async refreshSession(token: string) {
+    if (!env.JWT_REFRESH_ENABLED) {
+      throw new BadRequestError('Refresh tokens are disabled');
+    }
+
     try {
       verifyRefreshToken(token);
     } catch (err) {
@@ -314,11 +326,15 @@ export class AuthService {
 
     const user = (dbToken as any).user;
     const roles = user.userRoles.map((ur: any) => ur.role.name);
-    const newAccessToken = generateAccessToken({
-      userId: user.id,
-      email: user.email,
-      roles,
-    });
+    const accessTokenExpiry = env.JWT_REFRESH_ENABLED ? undefined : '7d';
+    const newAccessToken = generateAccessToken(
+      {
+        userId: user.id,
+        email: user.email,
+        roles,
+      },
+      accessTokenExpiry
+    );
 
     const newRefreshToken = generateRefreshToken(user.id);
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
@@ -428,21 +444,28 @@ export class AuthService {
 
     // Issue tokens
     const roles = user.userRoles.map((ur) => ur.role?.name || 'CHAMPION');
-    const accessToken = generateAccessToken({
-      userId: user.id,
-      email: user.email,
-      roles,
-    });
+    const accessTokenExpiry = env.JWT_REFRESH_ENABLED ? undefined : '7d';
+    const accessToken = generateAccessToken(
+      {
+        userId: user.id,
+        email: user.email,
+        roles,
+      },
+      accessTokenExpiry
+    );
 
-    const refreshTokenString = generateRefreshToken(user.id);
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-    await this.authRepository.saveRefreshToken(user.id, refreshTokenString, expiresAt);
+    let refreshTokenString: string | undefined;
+    if (env.JWT_REFRESH_ENABLED) {
+      refreshTokenString = generateRefreshToken(user.id);
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      await this.authRepository.saveRefreshToken(user.id, refreshTokenString, expiresAt);
+    }
 
     return {
       user: this.userService.sanitizeUser(user),
       tokens: {
         accessToken,
-        refreshToken: refreshTokenString,
+        ...(env.JWT_REFRESH_ENABLED && { refreshToken: refreshTokenString }),
       },
     };
   }

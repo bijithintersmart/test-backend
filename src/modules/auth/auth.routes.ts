@@ -3,6 +3,7 @@ import { authController } from './auth.controller';
 import { authenticate } from '../../core/middleware/auth.middleware';
 import { validateRequest } from '../../core/middleware/validation.middleware';
 import { strictRateLimiter } from '../../core/security/rate-limiter';
+import { env } from '../../config/env';
 import {
   registerSchema,
   loginSchema,
@@ -59,17 +60,6 @@ router.post(
   authController.resendOtp,
 );
 
-router.post(
-  '/refresh',
-  validateRequest(refreshSessionSchema),
-  authController.refresh
-);
-
-router.post(
-  '/logout',
-  authController.logout
-);
-
 // Authenticated Routes
 router.post(
   '/change-password',
@@ -78,11 +68,24 @@ router.post(
   authController.changePassword
 );
 
-router.post(
-  '/logout-all',
-  authenticate,
-  authController.logoutAll
-);
+if (env.JWT_REFRESH_ENABLED) {
+  router.post(
+    '/refresh',
+    validateRequest(refreshSessionSchema),
+    authController.refresh
+  );
+
+  router.post(
+    '/logout',
+    authController.logout
+  );
+
+  router.post(
+    '/logout-all',
+    authenticate,
+    authController.logoutAll
+  );
+}
 
 router.post(
   '/oauth',

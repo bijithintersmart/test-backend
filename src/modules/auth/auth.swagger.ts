@@ -1,4 +1,5 @@
 import { registry } from '../../config/openapi-registry';
+import { env } from '../../config/env';
 import {
   registerSchema,
   loginSchema,
@@ -163,49 +164,51 @@ registry.registerPath({
   },
 });
 
-// Register path: /auth/refresh
-registry.registerPath({
-  method: 'post',
-  path: '/auth/refresh',
-  summary: 'Refresh access and refresh tokens',
-  tags: ['Authentication'],
-  request: {
-    body: {
-      content: {
-        'application/json': {
-          schema: RefreshSessionInput,
+if (env.JWT_REFRESH_ENABLED) {
+  // Register path: /auth/refresh
+  registry.registerPath({
+    method: 'post',
+    path: '/auth/refresh',
+    summary: 'Refresh access and refresh tokens',
+    tags: ['Authentication'],
+    request: {
+      body: {
+        content: {
+          'application/json': {
+            schema: RefreshSessionInput,
+          },
         },
       },
     },
-  },
-  responses: {
-    200: {
-      description: 'Tokens refreshed successfully',
+    responses: {
+      200: {
+        description: 'Tokens refreshed successfully',
+      },
     },
-  },
-});
+  });
 
-// Register path: /auth/logout
-registry.registerPath({
-  method: 'post',
-  path: '/auth/logout',
-  summary: 'Log out user session',
-  tags: ['Authentication'],
-  request: {
-    body: {
-      content: {
-        'application/json': {
-          schema: RefreshSessionInput,
+  // Register path: /auth/logout
+  registry.registerPath({
+    method: 'post',
+    path: '/auth/logout',
+    summary: 'Log out user session',
+    tags: ['Authentication'],
+    request: {
+      body: {
+        content: {
+          'application/json': {
+            schema: RefreshSessionInput,
+          },
         },
       },
     },
-  },
-  responses: {
-    200: {
-      description: 'Logged out successfully',
+    responses: {
+      200: {
+        description: 'Logged out successfully',
+      },
     },
-  },
-});
+  });
+}
 
 // Register path: /auth/change-password
 registry.registerPath({
@@ -230,19 +233,21 @@ registry.registerPath({
   },
 });
 
-// Register path: /auth/logout-all
-registry.registerPath({
-  method: 'post',
-  path: '/auth/logout-all',
-  summary: 'Log out from all user devices (authenticated)',
-  tags: ['Authentication'],
-  security: [{ bearerAuth: [] }],
-  responses: {
-    200: {
-      description: 'Logged out from all devices successfully',
+if (env.JWT_REFRESH_ENABLED) {
+  // Register path: /auth/logout-all
+  registry.registerPath({
+    method: 'post',
+    path: '/auth/logout-all',
+    summary: 'Log out from all user devices (authenticated)',
+    tags: ['Authentication'],
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: {
+        description: 'Logged out from all devices successfully',
+      },
     },
-  },
-});
+  });
+}
 
 // Register path: /auth/oauth
 registry.registerPath({
