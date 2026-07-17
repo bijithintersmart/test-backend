@@ -88,26 +88,27 @@ export async function checkDockerAndExitIfInactive(): Promise<void> {
     return;
   }
 
-  // 1. Check if both Postgres and Redis ports are already open
-  const dbOpen = await isPortOpen(5432);
-  const redisOpen = await isPortOpen(6379);
-
-  if (dbOpen && redisOpen) {
-    // Both ports are open, nothing to start or fix!
-    return;
-  }
-
-  // 2. Since services are down, check if Docker is running
+  // 1. Check Docker status
   const status = checkDockerStatus();
 
-  // If Docker is not installed, assume native services (which are currently down).
-  // Let the database/redis connect calls try and fail normally.
+  // If Docker is not installed, assume native services (which might be running).
+  // We let the main app try to connect and fail normally.
   if (!status.installed) {
     return;
   }
 
   // If Docker is installed but daemon is not active
   if (!status.running) {
+    // Check if both Postgres (5432) and Redis (6379) are open natively
+    const dbOpen = await isPortOpen(5432);
+    const redisOpen = await isPortOpen(6379);
+
+    if (dbOpen && redisOpen) {
+      // Both ports are open, so they might be running native services.
+      // Let the main app try to connect.
+      return;
+    }
+
     console.error('\n========================================================================');
     console.error('❌ ERROR: Docker is installed but is currently disabled or not active.');
     console.error('👉 Please start the Docker daemon (e.g., open Docker Desktop) and try again.');
@@ -116,36 +117,80 @@ export async function checkDockerAndExitIfInactive(): Promise<void> {
     process.exit(1);
   }
 
-  // Docker daemon is active, but services are down. Auto-start them!
-  console.log('\n========================================================================');
-  console.log('ℹ️ Docker is active, but Postgres (5432) or Redis (6379) is not running.');
-  console.log('🚀 Attempting to automatically start services via Docker Compose...');
-  console.log('========================================================================\n');
-
+  // 2. Docker daemon is active. Let's see if the correct containers are running.
+  let runningContainers: string[] = [];
   try {
+    const output = execSync('docker ps --format "{{.Names}}"', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    runningContainers = output.split('\n').map(name => name.trim()).filter(Boolean);
+  } catch (e) {
+    // Ignore error
+  }
+
+  const postgresRunning = runningContainers.includes('enterprise-postgres');
+  const redisRunning = runningContainers.includes('enterprise-redis');
+
+  let needsStartPostgres = !postgresRunning;
+  let needsStartRedis = !redisRunning;
+
+  // Check if ports are occupied by non-project processes
+  if (needsStartPostgres) {
+    const dbPortOccupied = await isPortOpen(5432);
+    if (dbPortOccupied) {
+      console.error('\n========================================================================');
+      console.error('❌ ERROR: Port 5432 is already occupied by a native Postgres server (or another process).');
+      console.error('👉 Please stop the native Postgres server (e.g., run \'brew services stop postgresql\') or free up port 5432 so the Docker container can start.');
+      console.error('========================================================================\n');
+      process.exit(1);
+    }
+  }
+
+  if (needsStartRedis) {
+    const redisPortOccupied = await isPortOpen(6379);
+    if (redisPortOccupied) {
+      // If port 6379 is occupied (e.g., by "dev-redis" or another project container), we don't fail,
+      // we just warn the user and skip starting our own redis container to avoid conflict.
+      console.log('ℹ️ Port 6379 is already occupied by another Redis instance. Skipping container start to avoid conflict.\n');
+      needsStartRedis = false;
+    }
+  }
+
+  // 3. If any container needs starting, do it via Docker Compose
+  if (needsStartPostgres || needsStartRedis) {
+    const servicesToStart = [
+      needsStartPostgres ? 'postgres' : '',
+      needsStartRedis ? 'redis' : ''
+    ].filter(Boolean).join(' ');
+
+    console.log('\n========================================================================');
+    console.log(`ℹ️ Docker is active, but required services (${servicesToStart}) are not running.`);
+    console.log(`🚀 Attempting to automatically start: ${servicesToStart} via Docker Compose...`);
+    console.log('========================================================================\n');
+
     try {
-      execSync('docker compose up -d postgres redis', { stdio: 'inherit' });
-    } catch {
-      execSync('docker-compose up -d postgres redis', { stdio: 'inherit' });
-    }
-
-    console.log('\n⏳ Waiting for services to become ready...');
-
-    // Wait and check ports in a loop (up to 15 seconds)
-    for (let i = 0; i < 15; i++) {
-      await sleep(1000);
-      const dbReady = await isPortOpen(5432);
-      const redisReady = await isPortOpen(6379);
-      if (dbReady && redisReady) {
-        console.log('✅ Postgres and Redis are ready! Starting server...\n');
-        return;
+      try {
+        execSync(`docker compose up -d ${servicesToStart}`, { stdio: 'inherit' });
+      } catch {
+        execSync(`docker-compose up -d ${servicesToStart}`, { stdio: 'inherit' });
       }
-    }
 
-    console.warn('⚠️ Services were started, but did not respond on ports 5432 and 6379 in time.');
-  } catch (error) {
-    console.error('❌ Failed to automatically start services via Docker Compose.');
-    console.error(error);
-    process.exit(1);
+      console.log('\n⏳ Waiting for services to become ready...');
+
+      // Wait and check ports in a loop (up to 15 seconds)
+      for (let i = 0; i < 15; i++) {
+        await sleep(1000);
+        const dbReady = postgresRunning ? true : await isPortOpen(5432);
+        const redisReady = (redisRunning || !needsStartRedis) ? true : await isPortOpen(6379);
+        if (dbReady && redisReady) {
+          console.log('✅ Services are ready! Starting server...\n');
+          return;
+        }
+      }
+
+      console.warn('⚠️ Services were started, but did not respond on ports in time.');
+    } catch (error) {
+      console.error('❌ Failed to automatically start services via Docker Compose.');
+      console.error(error);
+      process.exit(1);
+    }
   }
 }
